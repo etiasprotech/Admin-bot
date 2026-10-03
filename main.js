@@ -6,20 +6,32 @@ const fs = require("fs");
 const path = require("path");
 
 const {
-    createBot
+    createBot,
+    startServer
 } = require("./server");
 
 /* ============================================================
-   CONFIG
+   PATHS
 ============================================================ */
 
 const AUTH_DIR = path.join(__dirname, "auth");
 const COMMANDS_DIR = path.join(__dirname, "commands");
+const DATABASE_DIR = path.join(__dirname, "database");
 
-if (!fs.existsSync(AUTH_DIR)) {
-    fs.mkdirSync(AUTH_DIR, {
-        recursive: true
-    });
+/* ============================================================
+   DIRECTORIES
+============================================================ */
+
+for (const dir of [
+    AUTH_DIR,
+    COMMANDS_DIR,
+    DATABASE_DIR
+]) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, {
+            recursive: true
+        });
+    }
 }
 
 /* ============================================================
@@ -30,8 +42,13 @@ const commands = new Map();
 
 function loadCommands() {
 
+    commands.clear();
+
     if (!fs.existsSync(COMMANDS_DIR)) {
-        console.log("[COMMANDS] commands folder not found");
+        console.log(
+            "[COMMANDS] commands folder not found"
+        );
+
         return;
     }
 
@@ -41,10 +58,11 @@ function loadCommands() {
 
     for (const file of files) {
 
-        const filePath = path.join(
-            COMMANDS_DIR,
-            file
-        );
+        const filePath =
+            path.join(
+                COMMANDS_DIR,
+                file
+            );
 
         try {
 
@@ -52,7 +70,8 @@ function loadCommands() {
                 require.resolve(filePath)
             ];
 
-            const command = require(filePath);
+            const command =
+                require(filePath);
 
             if (!command) {
                 continue;
@@ -63,35 +82,55 @@ function loadCommands() {
                 command.command ||
                 command.cmd;
 
+            /*
+             * Some modules may be event-only.
+             */
             if (!name) {
 
-                console.log(
-                    `[COMMANDS] Skipped ${file} - no command name`
-                );
+                if (
+                    typeof command.init === "function" ||
+                    typeof command.register === "function" ||
+                    typeof command.onMessage === "function"
+                ) {
+                    console.log(
+                        `[COMMAND] Loaded event module: ${file}`
+                    );
+                } else {
+                    console.log(
+                        `[COMMANDS] Skipped ${file} - no command name`
+                    );
+                }
 
                 continue;
             }
 
-            const aliases = Array.isArray(command.aliases)
-                ? command.aliases
-                : [];
+            const commandName =
+                String(name).toLowerCase();
 
             commands.set(
-                String(name).toLowerCase(),
+                commandName,
                 command
             );
 
+            console.log(
+                `[COMMAND] Loaded: ${commandName}`
+            );
+
+            const aliases =
+                Array.isArray(command.aliases)
+                    ? command.aliases
+                    : [];
+
             for (const alias of aliases) {
 
+                const aliasName =
+                    String(alias).toLowerCase();
+
                 commands.set(
-                    String(alias).toLowerCase(),
+                    aliasName,
                     command
                 );
             }
-
-            console.log(
-                `[COMMAND] Loaded: ${name}`
-            );
 
         } catch (error) {
 
@@ -108,22 +147,50 @@ function loadCommands() {
     );
 }
 
+/* ============================================================
+   LOAD COMMANDS
+============================================================ */
+
 loadCommands();
 
 /* ============================================================
-   EXPORT COMMANDS GLOBALLY
+   GLOBAL COMMANDS
 ============================================================ */
 
 global.commands = commands;
 
+global.etiasCommands = commands;
+
+global.botConfig = {
+
+    prefix: ".",
+
+    features: {
+        antidelete: true,
+        antilink: true,
+        antiviewonce: true,
+        viewonce: true
+    }
+};
+
 /* ============================================================
-   START PAIRING WEB SERVER
+   START EXPRESS SERVER
 ============================================================ */
 
-require("./server");
+try {
+
+    startServer();
+
+} catch (error) {
+
+    console.error(
+        "[SERVER] Failed to start:",
+        error
+    );
+}
 
 /* ============================================================
-   RESTORE SAVED BOTS
+   RESTORE SAVED WHATSAPP ACCOUNTS
 ============================================================ */
 
 async function restoreBots() {
@@ -131,23 +198,34 @@ async function restoreBots() {
     if (!fs.existsSync(AUTH_DIR)) {
 
         console.log(
-            "[RESTORE] auth folder does not exist"
+            "[RESTORE] No auth directory"
         );
 
         return;
     }
 
-    const entries = fs.readdirSync(
-        AUTH_DIR,
-        {
-            withFileTypes: true
-        }
-    );
+    const entries =
+        fs.readdirSync(
+            AUTH_DIR,
+            {
+                withFileTypes: true
+            }
+        );
 
-    const accounts = entries
-        .filter(entry => entry.isDirectory())
-        .map(entry => entry.name)
-        .filter(phone => /^[0-9]+$/.test(phone));
+    const accounts =
+        entries
+            .filter(
+                entry =>
+                    entry.isDirectory()
+            )
+            .map(
+                entry =>
+                    entry.name
+            )
+            .filter(
+                phone =>
+                    /^[0-9]+$/.test(phone)
+            );
 
     if (accounts.length === 0) {
 
@@ -184,14 +262,12 @@ async function restoreBots() {
             );
         }
 
-        /*
-         * Small delay between accounts.
-         * Helps avoid creating many connections
-         * at exactly the same time.
-         */
-
-        await new Promise(resolve =>
-            setTimeout(resolve, 1000)
+        await new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    1500
+                )
         );
     }
 }
@@ -201,25 +277,38 @@ async function restoreBots() {
 ============================================================ */
 
 async function start() {
-
     console.log(`
-╔══════════════════════════════════════════╗
-║          ETIAS-MINI-BOT                 ║
-║          MULTI ACCOUNT BOT              ║
-╠══════════════════════════════════════════╣
-║ Pairing: WhatsApp Phone Number          ║
-║ Session ID: DISABLED                    ║
-║ Commands: ENABLED                       ║
-║ Auto Restore: ENABLED                   ║
-╚══════════════════════════════════════════╝
-`);
+╔════════════════════════════════════════════╗
+║            ETIAS-MINI-BOT                 ║
+║            MULTI ACCOUNT BOT              ║
+╠════════════════════════════════════════════╣
+║ Pairing: WhatsApp Phone Number            ║
+║ Session ID: DISABLED                      ║
+║ Commands: ENABLED                         ║
+║ Auto Restore: ENABLED                     ║
+║ AntiDelete: ENABLED                       ║
+║ AntiLink: ENABLED                         ║
+║ AntiViewOnce: ENABLED                     ║
+║ ViewOnce: ENABLED                          ║
+║ Multi Account: ENABLED                    ║
+║ Auto Reconnect: ENABLED                   ║
+╚════════════════════════════════════════════╝
+    `);
 
+    /* START HTTP SERVER */
+    startServer();
+
+    /* RESTORE SAVED ACCOUNTS */
     await restoreBots();
 
     console.log(
         "[SYSTEM] ETIAS-MINI-BOT is ready"
     );
 }
+
+/* ============================================================
+   START
+============================================================ */
 
 start().catch(error => {
 
@@ -262,42 +351,28 @@ process.on(
    GRACEFUL SHUTDOWN
 ============================================================ */
 
-async function shutdown(signal) {
-
-    console.log(
-        `[SYSTEM] ${signal} received`
-    );
-
-    console.log(
-        "[SYSTEM] Shutting down..."
-    );
-
-    /*
-     * Baileys sockets are managed by server.js.
-     * We don't delete auth files here.
-     */
-
-    process.exit(0);
-}
-
 process.on(
     "SIGINT",
-    () => shutdown("SIGINT")
+    () => {
+
+        console.log(
+            "\n[SYSTEM] Shutting down..."
+        );
+
+        process.exit(0);
+
+    }
 );
 
 process.on(
     "SIGTERM",
-    () => shutdown("SIGTERM")
+    () => {
+
+        console.log(
+            "\n[SYSTEM] SIGTERM received..."
+        );
+
+        process.exit(0);
+
+    }
 );
-
-/* ============================================================
-   EXPORTS
-============================================================ */
-
-module.exports = {
-    commands,
-    loadCommands,
-    restoreBots
-};
-
-
