@@ -1,35 +1,73 @@
-const os = require('os');
+"use strict";
+
+const os = require("os");
 
 module.exports.name = "ping";
-module.exports.aliases = ["speed", "latency", "pong"];
+module.exports.aliases = [
+    "speed",
+    "latency",
+    "pong"
+];
 
 module.exports.execute = async (sock, msg, args) => {
-  const chatId = msg.key.remoteJid;
-  const start = Date.now();
 
-  // 🚀 React to command
-  try {
-    await sock.sendMessage(chatId, {
-      react: { text: "⚙️", key: msg.key }
-    });
-  } catch {}
+    const chatId = msg?.key?.remoteJid;
 
-  // Send processing
-  const m = await sock.sendMessage(chatId, {
-    text: "⚡ *Pinging...*"
-  }, { quoted: msg });
+    if (!chatId) {
+        throw new Error("Chat ID not found.");
+    }
 
-  const latency = Date.now() - start;
-  const uptimeSec = process.uptime();
-  const hours = Math.floor(uptimeSec / 3600);
-  const mins = Math.floor((uptimeSec % 3600) / 60);
-  const secs = Math.floor(uptimeSec % 60);
+    const start = Date.now();
 
-  const ramUsed = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2);
-  const ramTotal = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
-  const cpuModel = os.cpus()[0]?.model?.split('@')[0]?.trim() || "Unknown CPU";
+    // ⚙️ Processing reaction
+    try {
+        await sock.sendMessage(chatId, {
+            react: {
+                text: "⚙️",
+                key: msg.key
+            }
+        });
+    } catch (error) {
+        // Reaction failure should never stop ping
+    }
 
-  const text = `╭━━━〔 *ETIAS-MINI-BOT PING* 〕━━━┈⊷
+    // Calculate bot information
+    const uptimeSec = Math.floor(process.uptime());
+
+    const hours = Math.floor(
+        uptimeSec / 3600
+    );
+
+    const mins = Math.floor(
+        (uptimeSec % 3600) / 60
+    );
+
+    const secs = uptimeSec % 60;
+
+    const ramUsed = (
+        process.memoryUsage().heapUsed /
+        1024 /
+        1024
+    ).toFixed(2);
+
+    const ramTotal = (
+        os.totalmem() /
+        1024 /
+        1024 /
+        1024
+    ).toFixed(2);
+
+    const cpuModel =
+        os.cpus()?.[0]?.model
+            ?.split("@")[0]
+            ?.trim() ||
+        "Unknown CPU";
+
+    const latency =
+        Date.now() - start;
+
+    const text =
+`╭━━━〔 *ETIAS-MINI-BOT PING* 〕━━━┈⊷
 ┃
 ┃ 🚀 *Speed:* ${latency} ms
 ┃ ⏱️ *Latency:* ${latency} ms
@@ -43,19 +81,30 @@ module.exports.execute = async (sock, msg, args) => {
 
 > *POWERED BY ETIAS-TECH*`;
 
-  try {
-    await sock.sendMessage(chatId, {
-      text: text,
-      edit: m.key
-    });
-  } catch {
-    await sock.sendMessage(chatId, { text: text }, { quoted: msg });
-  }
+    // Send final response directly
+    await sock.sendMessage(
+        chatId,
+        {
+            text
+        },
+        {
+            quoted: msg
+        }
+    );
 
-  // Final reaction ⚡
-  try {
-    await sock.sendMessage(chatId, {
-      react: { text: "⚡", key: m.key }
-    });
-  } catch {}
+    // ⚡ Final reaction
+    try {
+        await sock.sendMessage(chatId, {
+            react: {
+                text: "⚡",
+                key: msg.key
+            }
+        });
+    } catch (error) {
+        // Ignore reaction failure
+    }
+
+    console.log(
+        `[PING] ${chatId} responded successfully`
+    );
 };

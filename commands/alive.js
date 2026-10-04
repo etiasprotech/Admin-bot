@@ -10,7 +10,7 @@ module.exports.aliases = ["bot", "online"];
 module.exports.execute = async (sock, msg) => {
   const chatId = msg.key.remoteJid;
 
-  try { await sock.sendMessage(chatId, { react: { text: "🤖", key: msg.key } }); } catch {}
+  try { await sock.sendMessage(chatId, { react: { text: "✨", key: msg.key } }); } catch {}
 
   const uptime = process.uptime();
   const h = Math.floor(uptime / 3600);
@@ -28,7 +28,7 @@ module.exports.execute = async (sock, msg) => {
 ┃ 🌐 *Mode:* Public
 ┃ 💾 *RAM:* ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB
 ┃
-┃ >  _I'm alive and ready to rock!_
+┃ > _I'm alive and ready to rock!_
 ╰━━━━━━━━━━━━━━━━━━┈⊷
 
 > *POWERED BY ETIAS-TECH*
