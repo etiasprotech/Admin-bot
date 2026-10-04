@@ -1,8 +1,5 @@
-node_modules/
-auth/
-.env
-*.log
-pairing/
+auth_info_baileys/
 database/
 auth/
 node_modules/
+.env
