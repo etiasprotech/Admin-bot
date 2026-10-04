@@ -3,3 +3,6 @@ auth/
 .env
 *.log
 pairing/
+database/
+auth/
+node_modules/
